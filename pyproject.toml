@@ -1,0 +1,14 @@
+[project]
+name = "kraken-fastapi-spot-radar"
+version = "0.1.0"
+description = "FastAPI dashboard for Kraken spot market movers"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+	"connector-kraken",
+	"fastapi[standard]>=0.141.1",
+	"httpx>=0.27.0",
+]
+
+[tool.uv.sources]
+connector-kraken = { git = "https://github.com/Ondrej-Stalmach/crypto-market-lab.git", subdirectory = "packages/kraken" }

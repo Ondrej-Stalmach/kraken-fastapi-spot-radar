@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111714">
+    <title>Kraken Spot Radar</title>
+    <link rel="stylesheet" href="/static/styles.css?v=2">
+    <script src="/static/app.js?v=2" defer></script>
+</head>
+
+<body>
+    <div class="app-shell">
+        <header class="masthead">
+            <a class="wordmark" href="/" aria-label="Kraken Spot Radar home">
+                <span class="wordmark-mark">K</span>
+                <span>KRAKEN / SPOT RADAR</span>
+            </a>
+            <div class="status-line" aria-live="polite">
+                <span class="live-dot" id="statusDot"></span>
+                <span id="connectionState">Connecting</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="stats" aria-label="Market summary">
+                <article class="stat-block">
+                    <span class="stat-label">Tracked pairs</span>
+                    <strong id="trackedCount">--</strong>
+                </article>
+                <article class="stat-block stat-positive">
+                    <span class="stat-label">Above 24h open</span>
+                    <strong id="positiveCount">--</strong>
+                </article>
+                <article class="stat-block stat-negative">
+                    <span class="stat-label">Below 24h open</span>
+                    <strong id="negativeCount">--</strong>
+                </article>
+                <article class="stat-block stat-meta">
+                    <div>
+                        <span class="stat-label">Latest market data</span>
+                        <p class="last-updated" id="lastUpdated">Waiting for first update</p>
+                    </div>
+                </article>
+            </section>
+
+            <section class="table-section" aria-label="Top Kraken spot movers">
+                <div class="leaderboard-grid">
+                    <section class="leaderboard gainers" aria-labelledby="gainersTitle">
+                        <div class="leaderboard-heading">
+                            <div>
+                                <span class="exchange-label">KRAKEN / SPOT</span>
+                                <h2 class="leaderboard-title" id="gainersTitle">Top 10 <span>Gainers</span></h2>
+                            </div>
+                            <span class="rank-tag">HIGHEST OC</span>
+                        </div>
+                        <div class="table-frame">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Pair</th>
+                                        <th scope="col">Open price</th>
+                                        <th scope="col">Last price</th>
+                                        <th scope="col" class="oc-column">OC</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gainerRows">
+                                    <tr>
+                                        <td class="empty-state" colspan="4">Loading market data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="leaderboard losers" aria-labelledby="losersTitle">
+                        <div class="leaderboard-heading">
+                            <div>
+                                <span class="exchange-label">KRAKEN / SPOT</span>
+                                <h2 class="leaderboard-title" id="losersTitle">Top 10 <span>Losers</span></h2>
+                            </div>
+                            <span class="rank-tag">LOWEST OC</span>
+                        </div>
+                        <div class="table-frame">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Pair</th>
+                                        <th scope="col">Open price</th>
+                                        <th scope="col">Last price</th>
+                                        <th scope="col" class="oc-column">OC</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="loserRows">
+                                    <tr>
+                                        <td class="empty-state" colspan="4">Loading market data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </main>
+
+    </div>
+</body>
+
+</html>
