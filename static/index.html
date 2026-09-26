@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#111714">
     <title>Kraken Spot Radar</title>
-    <link rel="stylesheet" href="/static/styles.css?v=2">
-    <script src="/static/app.js?v=2" defer></script>
+    <link rel="stylesheet" href="/static/styles.css?v=5">
+    <script src="/static/app.js?v=6" defer></script>
 </head>
 
 <body>
@@ -17,9 +17,17 @@
                 <span class="wordmark-mark">K</span>
                 <span>KRAKEN / SPOT RADAR</span>
             </a>
-            <div class="status-line" aria-live="polite">
-                <span class="live-dot" id="statusDot"></span>
-                <span id="connectionState">Connecting</span>
+            <div class="masthead-actions">
+                <button class="control-button" id="signalsToggle" type="button" aria-label="Open signal history"
+                    aria-expanded="false" aria-controls="signalsSidebar">
+                    <span>Signals</span>
+                    <span class="signal-count" id="signalCount" aria-hidden="true">0</span>
+                </button>
+                <button class="control-button" id="soundToggle" type="button" aria-pressed="false">Sound off</button>
+                <div class="status-line" aria-live="polite">
+                    <span class="live-dot" id="statusDot"></span>
+                    <span id="connectionState">Connecting</span>
+                </div>
             </div>
         </header>
 
@@ -62,12 +70,14 @@
                                         <th scope="col">Pair</th>
                                         <th scope="col">Open price</th>
                                         <th scope="col">Last price</th>
+                                        <th scope="col" class="volume-column">Volume</th>
                                         <th scope="col" class="oc-column">OC</th>
+                                        <th scope="col" class="delta5m-column">5m delta</th>
                                     </tr>
                                 </thead>
                                 <tbody id="gainerRows">
                                     <tr>
-                                        <td class="empty-state" colspan="4">Loading market data...</td>
+                                        <td class="empty-state" colspan="6">Loading market data...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -89,12 +99,14 @@
                                         <th scope="col">Pair</th>
                                         <th scope="col">Open price</th>
                                         <th scope="col">Last price</th>
+                                        <th scope="col" class="volume-column">Volume</th>
                                         <th scope="col" class="oc-column">OC</th>
+                                        <th scope="col" class="delta5m-column">5m delta</th>
                                     </tr>
                                 </thead>
                                 <tbody id="loserRows">
                                     <tr>
-                                        <td class="empty-state" colspan="4">Loading market data...</td>
+                                        <td class="empty-state" colspan="6">Loading market data...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -104,6 +116,18 @@
             </section>
         </main>
 
+        <aside class="signals-sidebar" id="signalsSidebar" aria-labelledby="signalsTitle" aria-hidden="true" inert>
+            <div class="signals-sidebar-header">
+                <div>
+                    <span class="exchange-label">PRICE MOVEMENT</span>
+                    <h2 class="sidebar-title" id="signalsTitle">Signals</h2>
+                </div>
+                <button class="control-button" id="closeSignals" type="button"
+                    aria-label="Close signal history">Close</button>
+            </div>
+            <p class="signals-empty" id="signalsEmpty">No signals yet.</p>
+            <ol class="signal-list" id="signalList" hidden></ol>
+        </aside>
     </div>
 </body>
 

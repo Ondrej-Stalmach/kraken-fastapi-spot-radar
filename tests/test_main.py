@@ -1,11 +1,13 @@
 import unittest
+from collections import deque
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import httpx
 from connector_kraken import KrakenAPIError, SpotTickerMetric
 
-from main import app
+from main import _record_price_and_calculate_five_minute_delta, app
 
 
 SAMPLE_TICKERS: list[SpotTickerMetric] = [
@@ -31,6 +33,59 @@ OFFLINE_TICKER: SpotTickerMetric = {
 
 
 class MainAppTests(unittest.IsolatedAsyncioTestCase):
+    def test_five_minute_delta_uses_a_rolling_price_baseline(self) -> None:
+        history: deque[tuple[datetime, float]] = deque()
+        started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        self.assertIsNone(
+            _record_price_and_calculate_five_minute_delta(
+                history, 100.0, started_at
+            )
+        )
+        self.assertIsNone(
+            _record_price_and_calculate_five_minute_delta(
+                history, 100.5, started_at + timedelta(seconds=10)
+            )
+        )
+        self.assertEqual(
+            _record_price_and_calculate_five_minute_delta(
+                history, 103.0, started_at + timedelta(minutes=5)
+            ),
+            3.0,
+        )
+        self.assertEqual(
+            _record_price_and_calculate_five_minute_delta(
+                history, 103.515, started_at + timedelta(minutes=5, seconds=10)
+            ),
+            3.0,
+        )
+
+    def test_five_minute_delta_requires_a_fresh_baseline(self) -> None:
+        history: deque[tuple[datetime, float]] = deque()
+        started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        self.assertIsNone(
+            _record_price_and_calculate_five_minute_delta(
+                history, 100.0, started_at
+            )
+        )
+        self.assertIsNone(
+            _record_price_and_calculate_five_minute_delta(
+                history, 100.5, started_at + timedelta(seconds=10)
+            )
+        )
+        self.assertEqual(
+            _record_price_and_calculate_five_minute_delta(
+                history, 103.0, started_at + timedelta(minutes=5, seconds=30)
+            ),
+            2.49,
+        )
+        self.assertIsNone(
+            _record_price_and_calculate_five_minute_delta(
+                history, 104.0, started_at + timedelta(minutes=5, seconds=31)
+            )
+        )
+
     async def _get(
         self,
         path: str,
@@ -59,6 +114,7 @@ class MainAppTests(unittest.IsolatedAsyncioTestCase):
         response = await self._get("/", [])
         self.assertEqual(response.status_code, 200)
         self.assertIn("Kraken Spot Radar", response.text)
+        self.assertIn("Volume", response.text)
 
     async def test_ticker_route_returns_only_online_market_data(self) -> None:
         response = await self._get(
@@ -75,6 +131,8 @@ class MainAppTests(unittest.IsolatedAsyncioTestCase):
                     "symbol": "XBT/USD",
                     "openPrice": 100.0,
                     "currentPrice": 110.5,
+                    "volumeUsdToday": 1000,
+                    "delta5m": None,
                     "oc": 10.5,
                 }
             ],

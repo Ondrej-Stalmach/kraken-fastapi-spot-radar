@@ -17,7 +17,9 @@ flowchart TD
     KrakenClient --> OnlinePairsCache
     KrakenClient -->|GET /0/public/Ticker every 10s| KrakenAPI
     OnlinePairsCache --> TickerFilter
-    TickerFilter --> Snapshot
+    TickerFilter --> FiveMinutePriceHistory
+    FiveMinutePriceHistory --> Snapshot
+    Browser --> BrowserSignalHistory
 ```
 
 At startup, the FastAPI lifespan creates one `httpx.AsyncClient` and starts a
@@ -27,9 +29,23 @@ At startup, the FastAPI lifespan creates one `httpx.AsyncClient` and starts a
   only pairs in the online-pair cache before replacing the ticker snapshot. Pair
   names are normalized so the ticker form `XBT/USD` matches the `AssetPairs`
   alternate name `XBTUSD`. If fetching `AssetPairs` fails, the previous ticker
-  snapshot remains intact and the app retries on its next refresh. The dashboard
-  polls the local ticker route at the same interval. When no snapshot has been
-  loaded yet, that route attempts an immediate refresh.
+  snapshot remains intact and the app retries on its next refresh. Each accepted
+  ticker sample is also kept in a per-pair in-memory history; `delta5m` compares
+  the latest price with the most recent sample at or before the five-minute
+  cutoff, provided the sample is no more than two refresh intervals (20
+  seconds) older than the cutoff. If no sample meets that freshness limit,
+  `delta5m` is `null` until a valid baseline becomes available. The history
+  resets when the process restarts. This reuses the existing refresh loop and
+  does not add another polling request. The dashboard polls the local ticker
+  route at the same ten-second interval. When no snapshot has been loaded yet,
+  that route attempts an immediate refresh.
+
+The browser checks the top ten 24-hour gainers and losers after each snapshot.
+It records a signal when a gainer's `delta5m` is above +3% or a loser's is below
+-3%, with the snapshot time, pair, and delta. A condition that stays active is
+logged only once until it clears. The latest 100 signals are stored in browser
+`localStorage`. Sound alerts use the Web Audio API and must be enabled by the
+user because browsers restrict automatic audio playback.
 
 ## Modules
 
@@ -37,7 +53,8 @@ At startup, the FastAPI lifespan creates one `httpx.AsyncClient` and starts a
   routes, and mapping from connector metrics to the ticker response.
 - `connector-kraken` fetches and validates public USD spot ticker data.
 - `static/index.html`, `static/styles.css`, and `static/app.js` render the
-  dashboard, rank movers, and display connection and freshness state.
+  dashboard, rank movers, display connection and freshness state, and manage
+  the slide-out signal history and sound alerts.
 - `tests/` verifies route behavior using a mocked connector.
 
 ## Market data contract
@@ -51,7 +68,9 @@ oc = round((currentPrice - openPrice) / openPrice * 100, 2)
 ```
 
 Pairs with a non-positive open or negative last price are excluded. The
-`symbol` is the connector's normalized pair name, such as `XBT/USD`.
+`symbol` is the connector's normalized pair name, such as `XBT/USD`. `delta5m`
+is the percent change from the selected five-minute baseline; it is `null` until
+enough samples have accumulated.
 
 ## Cache and failures
 
