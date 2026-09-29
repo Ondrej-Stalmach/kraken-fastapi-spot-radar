@@ -4,6 +4,11 @@ const SIGNALS_STORAGE_KEY = "kraken-spot-radar:signals:v1";
 const ACTIVE_SIGNAL_KEYS_STORAGE_KEY = "kraken-spot-radar:active-signals:v1";
 const MAX_SAVED_SIGNALS = 100;
 const ALERT_DELTA_THRESHOLD = 3;
+const CONNECTION_CHIP_CLASSES = {
+    "is-live": "chip-live",
+    "is-partial": "chip-warning",
+    "is-error": "chip-error",
+};
 
 const savedSignals = loadSavedSignals();
 
@@ -20,6 +25,7 @@ const state = {
 const elements = {
     connectionState: document.querySelector("#connectionState"),
     statusDot: document.querySelector("#statusDot"),
+    connectionChip: document.querySelector("#connectionChip"),
     trackedCount: document.querySelector("#trackedCount"),
     positiveCount: document.querySelector("#positiveCount"),
     negativeCount: document.querySelector("#negativeCount"),
@@ -30,6 +36,7 @@ const elements = {
     signalCount: document.querySelector("#signalCount"),
     signalsSidebar: document.querySelector("#signalsSidebar"),
     closeSignals: document.querySelector("#closeSignals"),
+    sidebarBackdrop: document.querySelector("#sidebarBackdrop"),
     signalsEmpty: document.querySelector("#signalsEmpty"),
     signalList: document.querySelector("#signalList"),
     soundToggle: document.querySelector("#soundToggle"),
@@ -145,6 +152,17 @@ function saveActiveSignalKeys() {
     }
 }
 
+function renderEmptyRow(message, withSpinner = false) {
+    const spinner = withSpinner ? '<div class="spinner" role="presentation"></div>' : "";
+    return `<tr><td class="empty-state" colspan="6"><div class="empty-loader">${spinner}<span>${escapeHtml(message)}</span></div></td></tr>`;
+}
+
+function renderLoadingRows() {
+    const row = renderEmptyRow("Loading market data...", true);
+    elements.gainerRows.innerHTML = row;
+    elements.loserRows.innerHTML = row;
+}
+
 function formatSignalTime(value) {
     const timestamp = new Date(value);
     if (!Number.isFinite(timestamp.getTime())) {
@@ -170,7 +188,7 @@ function renderSignals() {
         const movement = signal.delta5m > 0 ? "positive" : "negative";
 
         return `
-            <li class="signal-entry">
+            <li class="signal-entry signal-${direction}">
                 <div class="signal-entry-heading">
                     <strong class="signal-pair">${escapeHtml(signal.symbol)}</strong>
                     <time datetime="${escapeHtml(signal.timestamp)}">${escapeHtml(formatSignalTime(signal.timestamp))}</time>
@@ -199,7 +217,7 @@ function getTopRows(rows, descending) {
 
 function renderRows(rows, target) {
     if (!rows.length) {
-        target.innerHTML = '<tr><td class="empty-state" colspan="6">No market data</td></tr>';
+        target.innerHTML = renderEmptyRow("No market data");
         return;
     }
 
@@ -213,12 +231,18 @@ function renderRows(rows, target) {
 
         return `
             <tr>
-                <td class="symbol-cell">${escapeHtml(row.symbol)}</td>
+                <td class="symbol-cell">
+                    <span class="pair-badge">${escapeHtml(row.symbol)}</span>
+                </td>
                 <td class="number-cell" data-label="Open price">${formatPrice(row.openPrice)}</td>
                 <td class="number-cell" data-label="Last price">${formatPrice(row.currentPrice)}</td>
                 <td class="number-cell volume-cell" data-label="Volume">${formatUsdVolume(row.volumeUsdToday)}</td>
-                <td class="oc-cell ${movementClass}">${formatPercent(change)}</td>
-                <td class="number-cell delta5m-cell ${deltaMovementClass}" data-label="5m delta">${formatPercent(row.delta5m)}</td>
+                <td class="oc-cell ${movementClass}" data-label="OC">
+                    <span class="pill-badge ${movementClass}">${formatPercent(change)}</span>
+                </td>
+                <td class="number-cell delta5m-cell ${deltaMovementClass}" data-label="5m delta">
+                    <span class="pill-badge ${deltaMovementClass}">${formatPercent(row.delta5m)}</span>
+                </td>
             </tr>
         `;
     }).join("");
@@ -290,12 +314,24 @@ function render(snapshotTime = new Date()) {
 function setConnectionState(label, stateClass) {
     elements.connectionState.textContent = label;
     elements.statusDot.className = `live-dot ${stateClass}`;
+
+    const connectionChip = elements.connectionChip;
+    if (!connectionChip) {
+        return;
+    }
+
+    const chipClass = CONNECTION_CHIP_CLASSES[stateClass] ?? "chip-live";
+    connectionChip.className = `stat-chip ${chipClass}`;
+    connectionChip.textContent = label;
 }
 
 function setSignalsPanelOpen(isOpen) {
     elements.signalsSidebar.classList.toggle("is-open", isOpen);
     elements.signalsSidebar.setAttribute("aria-hidden", String(!isOpen));
     elements.signalsSidebar.toggleAttribute("inert", !isOpen);
+    if (elements.sidebarBackdrop) {
+        elements.sidebarBackdrop.classList.toggle("is-open", isOpen);
+    }
     elements.signalsToggle.setAttribute("aria-expanded", String(isOpen));
     elements.signalsToggle.setAttribute(
         "aria-label",
@@ -399,6 +435,7 @@ elements.signalsToggle.addEventListener("click", () => {
     setSignalsPanelOpen(!isOpen);
 });
 elements.closeSignals.addEventListener("click", () => setSignalsPanelOpen(false));
+elements.sidebarBackdrop?.addEventListener("click", () => setSignalsPanelOpen(false));
 elements.soundToggle.addEventListener("click", () => {
     void toggleSound();
 });
@@ -408,6 +445,11 @@ window.addEventListener("keydown", (event) => {
     }
 });
 
+document.querySelectorAll("[data-poll-seconds]").forEach((node) => {
+    node.textContent = `${POLL_INTERVAL_MS / 1000}s`;
+});
+
+renderLoadingRows();
 render();
 loadTickers();
 window.setInterval(loadTickers, POLL_INTERVAL_MS);
