@@ -30,15 +30,18 @@ At startup, the FastAPI lifespan creates one `httpx.AsyncClient` and starts a
   names are normalized so the ticker form `XBT/USD` matches the `AssetPairs`
   alternate name `XBTUSD`. If fetching `AssetPairs` fails, the previous ticker
   snapshot remains intact and the app retries on its next refresh. Each accepted
-  ticker sample is also kept in a per-pair in-memory history; `delta5m` compares
+  ticker sample is also kept in a per-pair in-memory history. `delta5m` compares
   the latest price with the most recent sample at or before the five-minute
   cutoff, provided the sample is no more than two refresh intervals (20
-  seconds) older than the cutoff. If no sample meets that freshness limit,
-  `delta5m` is `null` until a valid baseline becomes available. The history
-  resets when the process restarts. This reuses the existing refresh loop and
-  does not add another polling request. The dashboard polls the local ticker
-  route at the same ten-second interval. When no snapshot has been loaded yet,
-  that route attempts an immediate refresh.
+  seconds) older than the cutoff; if no sample meets that freshness limit,
+  `delta5m` is `null` until a valid baseline becomes available. Once a value is
+  calculated it stays frozen for five minutes and is then recalculated against
+  the new cutoff, so `delta5m` updates once every five minutes while current
+  prices and 24h open-close metrics continue refreshing every ten seconds. The
+  history resets when the process restarts. This reuses the existing refresh
+  loop and does not add another polling request. The dashboard polls the local
+  ticker route at the same ten-second interval. When no snapshot has been loaded
+  yet, that route attempts an immediate refresh.
 
 The browser checks the top ten 24-hour gainers and losers after each snapshot.
 It records a signal when a gainer's `delta5m` is above +3% or a loser's is below

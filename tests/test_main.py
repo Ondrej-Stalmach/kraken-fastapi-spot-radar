@@ -1,5 +1,4 @@
 import unittest
-from collections import deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
@@ -7,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 from connector_kraken import KrakenAPIError, SpotTickerMetric
 
-from main import _record_price_and_calculate_five_minute_delta, app
+from main import PriceHistory, _record_price_and_calculate_five_minute_delta, app
 
 
 SAMPLE_TICKERS: list[SpotTickerMetric] = [
@@ -33,8 +32,10 @@ OFFLINE_TICKER: SpotTickerMetric = {
 
 
 class MainAppTests(unittest.IsolatedAsyncioTestCase):
-    def test_five_minute_delta_uses_a_rolling_price_baseline(self) -> None:
-        history: deque[tuple[datetime, float]] = deque()
+    def test_five_minute_delta_remains_frozen_for_five_minutes_and_updates_periodically(
+        self,
+    ) -> None:
+        history = PriceHistory()
         started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
         self.assertIsNone(
@@ -53,15 +54,42 @@ class MainAppTests(unittest.IsolatedAsyncioTestCase):
             ),
             3.0,
         )
+        # During the 5-minute frozen window, delta remains frozen even when price changes
         self.assertEqual(
             _record_price_and_calculate_five_minute_delta(
-                history, 103.515, started_at + timedelta(minutes=5, seconds=10)
+                history, 110.0, started_at + timedelta(minutes=5, seconds=10)
+            ),
+            3.0,
+        )
+        self.assertEqual(
+            _record_price_and_calculate_five_minute_delta(
+                history, 95.0, started_at + timedelta(minutes=5, seconds=30)
+            ),
+            3.0,
+        )
+        self.assertEqual(
+            _record_price_and_calculate_five_minute_delta(
+                history, 120.0, started_at + timedelta(minutes=9, seconds=50)
+            ),
+            3.0,
+        )
+        # After 5 minutes elapse, delta updates using the baseline from 5 minutes ago (103.0 at t=5m)
+        self.assertEqual(
+            _record_price_and_calculate_five_minute_delta(
+                history, 106.09, started_at + timedelta(minutes=10)
+            ),
+            3.0,
+        )
+        # Remains frozen again for the new 5-minute window
+        self.assertEqual(
+            _record_price_and_calculate_five_minute_delta(
+                history, 150.0, started_at + timedelta(minutes=10, seconds=10)
             ),
             3.0,
         )
 
     def test_five_minute_delta_requires_a_fresh_baseline(self) -> None:
-        history: deque[tuple[datetime, float]] = deque()
+        history = PriceHistory()
         started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
         self.assertIsNone(
@@ -74,15 +102,29 @@ class MainAppTests(unittest.IsolatedAsyncioTestCase):
                 history, 100.5, started_at + timedelta(seconds=10)
             )
         )
+        # At t=5m30s, comparison_at is 30s. Sample at 10s is 20s older (<= MAX_PRICE_SAMPLE_GAP)
         self.assertEqual(
             _record_price_and_calculate_five_minute_delta(
                 history, 103.0, started_at + timedelta(minutes=5, seconds=30)
             ),
             2.49,
         )
-        self.assertIsNone(
+        # At t=5m31s, delta remains frozen from t=5m30s
+        self.assertEqual(
             _record_price_and_calculate_five_minute_delta(
                 history, 104.0, started_at + timedelta(minutes=5, seconds=31)
+            ),
+            2.49,
+        )
+
+        # A gap larger than MAX_PRICE_SAMPLE_GAP (20s) without baseline yields None
+        fresh_history = PriceHistory()
+        _record_price_and_calculate_five_minute_delta(
+            fresh_history, 100.0, started_at
+        )
+        self.assertIsNone(
+            _record_price_and_calculate_five_minute_delta(
+                fresh_history, 104.0, started_at + timedelta(minutes=5, seconds=21)
             )
         )
 

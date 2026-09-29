@@ -16,8 +16,18 @@ HTTP_TIMEOUT_SECONDS = 10
 FIVE_MINUTE_WINDOW = timedelta(minutes=5)
 MAX_PRICE_SAMPLE_GAP = timedelta(seconds=TICKERS_REFRESH_INTERVAL_SECONDS * 2)
 
+
+class PriceHistory(deque[tuple[datetime, float]]):
+    """In-memory price history plus the current frozen five-minute delta state."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.last_calculated_at: datetime | None = None
+        self.delta_5m: float | None = None
+
+
 _ticker_data: list[dict[str, object]] = []
-_price_history: dict[str, deque[tuple[datetime, float]]] = {}
+_price_history: dict[str, PriceHistory] = {}
 _last_updated_at: datetime | None = None
 _online_spot_pairs: set[str] = set()
 _online_pairs_updated_on: date | None = None
@@ -36,7 +46,7 @@ async def get_http_client() -> httpx.AsyncClient:
 
 
 def _record_price_and_calculate_five_minute_delta(
-    history: deque[tuple[datetime, float]],
+    history: PriceHistory,
     price: float,
     observed_at: datetime,
 ) -> float | None:
@@ -46,6 +56,13 @@ def _record_price_and_calculate_five_minute_delta(
     while len(history) > 1 and history[1][0] <= comparison_at:
         history.popleft()
 
+    # A delta is frozen for five minutes: reuse it until the window has elapsed.
+    if (
+        history.last_calculated_at is not None
+        and observed_at - history.last_calculated_at < FIVE_MINUTE_WINDOW
+    ):
+        return history.delta_5m
+
     if not history or history[0][0] > comparison_at:
         return None
 
@@ -53,7 +70,9 @@ def _record_price_and_calculate_five_minute_delta(
     if baseline_price <= 0 or comparison_at - sample_at > MAX_PRICE_SAMPLE_GAP:
         return None
 
-    return float(round((price - baseline_price) / baseline_price * 100, 2))
+    history.last_calculated_at = observed_at
+    history.delta_5m = float(round((price - baseline_price) / baseline_price * 100, 2))
+    return history.delta_5m
 
 
 async def refresh_ticker_data() -> list[dict[str, object]]:
@@ -87,7 +106,7 @@ async def refresh_ticker_data() -> list[dict[str, object]]:
                 continue
 
             current_price_value = float(current_price)
-            history = _price_history.setdefault(ticker["pair"], deque())
+            history = _price_history.setdefault(ticker["pair"], PriceHistory())
             delta_5m = _record_price_and_calculate_five_minute_delta(
                 history, current_price_value, observed_at
             )

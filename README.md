@@ -6,10 +6,10 @@ the pair count and the number of markets above or below their 24-hour open.
 
 The dashboard and API use `connector-kraken` to read Kraken's public Ticker
 endpoint; no API key or account access is needed. The dashboard also shows
-each pair's USD volume and rolling five-minute price change. When a top-ten
-gainer moves above +3% or a top-ten loser moves below -3% over five minutes,
-the browser records a timestamped signal in the slide-out history. Sound alerts
-can be enabled from the dashboard.
+each pair's USD volume and five-minute price change (frozen for five-minute
+intervals). When a top-ten gainer moves above +3% or a top-ten loser moves below
+-3% over five minutes, the browser records a timestamped signal in the slide-out
+history. Sound alerts can be enabled from the dashboard.
 
 ## Run locally
 
@@ -36,10 +36,11 @@ The ticker response has a `count`, an `updatedAt` timestamp, and a `data`
 array. Each row contains `symbol`, `openPrice`, `currentPrice`, `volumeUsdToday`,
 `delta5m`, and `oc`. `volumeUsdToday` is today's USD volume (rounded to the
 nearest $1,000 by the connector), `delta5m` is the percentage move over the
-previous five minutes, and `oc` is the percentage move from the 24-hour open.
-`delta5m` is `null` until a valid baseline is available. The baseline must be
-within 20 seconds of the five-minute cutoff; a longer sampling gap can keep
-`delta5m` null until a fresh baseline becomes available.
+five-minute baseline (frozen for five minutes once computed), and `oc` is the
+percentage move from the 24-hour open. `delta5m` is `null` until a valid baseline
+is available. The baseline must be within 20 seconds of the five-minute cutoff;
+a longer sampling gap can keep `delta5m` null until a fresh baseline becomes
+available.
 
 ## Tests
 
